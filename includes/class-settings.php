@@ -180,15 +180,21 @@ final class Settings {
 		$clean             = array_values(array_unique($clean));
 		$out['post_types'] = !empty($clean) ? $clean : $this->default_post_types();
 
-		$root = trim((string) ($raw['document_root_selector'] ?? $defaults['document_root_selector']));
+		$root = (string) ($raw['document_root_selector'] ?? $defaults['document_root_selector']);
+		$root = sanitize_text_field(wp_unslash($root));
+		$root = trim($root);
 		$root = substr($root, 0, 500);
-		$out['document_root_selector'] = ('' === $root) ? (string) $defaults['document_root_selector'] : $root;
 
-		$ignore = trim((string) ($raw['ignore_selectors'] ?? $defaults['ignore_selectors']));
+		$out['document_root_selector'] = ('' === $root)
+			? (string) $defaults['document_root_selector']
+			: $root;
+
+		$ignore = (string) ($raw['ignore_selectors'] ?? $defaults['ignore_selectors']);
+		$ignore = sanitize_textarea_field(wp_unslash($ignore));
+		$ignore = trim($ignore);
 		$ignore = substr($ignore, 0, 2000);
-		$out['ignore_selectors'] = $ignore;
 
-		$out['respect_noindex'] = !empty($raw['respect_noindex']) ? 1 : 0;
+		$out['ignore_selectors'] = $ignore;
 
 		return $out;
 	}
