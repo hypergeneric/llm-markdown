@@ -10,13 +10,11 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Expose public WordPress posts and pages as real .md URLs with YAML front matter — designed for LLMs, AI ingestion, headless WordPress, and content export workflows.
-
-Simply append .md to any supported post or page URL to access its Markdown representation.
+Expose WordPress posts and pages as real .md URLs with YAML front matter for LLMs, AI ingestion, and headless workflows.
 
 == Description ==
 
-LLM Markdown exposes your public WordPress posts and pages as real `.md` routes.
+LLM Markdown exposes your public WordPress posts and pages as real `.md` routes.  Simply append .md to any supported post or page URL to access its Markdown representation.
 
 Each Markdown document includes structured YAML front matter and clean content extracted from the rendered HTML.
 
@@ -73,6 +71,10 @@ No. Password-protected and non-public content are excluded.
 = Is this intended for SEO? =
 
 It provides an alternate Markdown representation. Search engine behavior may vary.
+
+== Screenshots ==
+
+1. Settings screen (post types and selectors)
 
 == Changelog ==
 
