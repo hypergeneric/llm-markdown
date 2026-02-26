@@ -196,6 +196,9 @@ final class Settings {
 
 		$out['ignore_selectors'] = $ignore;
 
+		// Checkbox: when unchecked, it may be absent from $_POST entirely.
+		$out['respect_noindex'] = isset($raw['respect_noindex']) ? 1 : 0;
+
 		return $out;
 	}
 

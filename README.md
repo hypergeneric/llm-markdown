@@ -1,7 +1,8 @@
 === LLM Markdown – Expose Content as .md ===
 
+Donate link: https://www.paypal.com/donate/?hosted_button_id=EUHE8NXYEXJJ6  
 Contributors: michaelsablone
-Tags: markdown, llm, ai, seo
+Tags: markdown, llm, ai, headless, content-export
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
@@ -9,7 +10,9 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Expose public WordPress content as clean .md routes with YAML front matter, optimized for LLMs, AI crawlers, and headless workflows.
+Expose public WordPress posts and pages as real .md URLs with YAML front matter — designed for LLMs, AI ingestion, headless WordPress, and content export workflows.
+
+Simply append .md to any supported post or page URL to access its Markdown representation.
 
 == Description ==
 
@@ -50,6 +53,10 @@ No Gutenberg lock-in. No content duplication. No custom post types required.
 After activation, append `.md` to supported post URLs.
 
 == Frequently Asked Questions ==
+
+= Does this help LLMs index my content? =
+
+The plugin exposes a structured Markdown representation of your content. How LLMs discover and use it depends on the model or crawler.
 
 = Does this modify my content? =
 
