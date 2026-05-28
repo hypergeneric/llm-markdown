@@ -88,6 +88,11 @@ final class Settings {
 		return !empty($options['respect_noindex']);
 	}
 
+	public function should_include_images(): bool {
+		$options = $this->get_options();
+		return !empty($options['include_images']);
+	}
+
 	public function register_admin_menu(): void {
 		add_options_page(
 			esc_html__('Markdown Output Settings', 'llm-markdown'),
@@ -149,6 +154,14 @@ final class Settings {
 			'llm-markdown',
 			'llm_markdown_main'
 		);
+
+		add_settings_field(
+			'include_images',
+			esc_html__('Include Images', 'llm-markdown'),
+			[$this, 'render_include_images_field'],
+			'llm-markdown',
+			'llm_markdown_main'
+		);
 	}
 
 	/**
@@ -196,10 +209,31 @@ final class Settings {
 
 		$out['ignore_selectors'] = $ignore;
 
+		$include_images = isset($raw['include_images']) ? wp_unslash($raw['include_images']) : '';
+		$include_images = is_scalar($include_images) ? sanitize_text_field((string) $include_images) : '';
+
+		$out['include_images'] = ('1' === $include_images) ? 1 : 0;
+
 		// Checkbox: when unchecked, it may be absent from $_POST entirely.
 		$out['respect_noindex'] = isset($raw['respect_noindex']) ? 1 : 0;
 
 		return $out;
+	}
+	
+
+	public function render_include_images_field(): void {
+		$options = $this->get_options();
+
+		printf(
+			'<label><input type="checkbox" name="%1$s[include_images]" value="1" %2$s /> %3$s</label>',
+			esc_attr(self::OPTION_NAME),
+			checked(!empty($options['include_images']), true, false),
+			esc_html__('Convert image tags to Markdown image syntax.', 'llm-markdown')
+		);
+
+		echo '<p class="description">';
+		echo esc_html__('When enabled, images with a valid src attribute are included as Markdown image links using alt text and title when available.', 'llm-markdown');
+		echo '</p>';
 	}
 
 	public function render_post_types_field(): void {
@@ -293,6 +327,7 @@ final class Settings {
 			'document_root_selector' => 'main, article, #content, #main-content, #app',
 			'ignore_selectors'       => 'header, footer, nav, form',
 			'respect_noindex'        => 1,
+			'include_images'         => 0,
 		];
 	}
 

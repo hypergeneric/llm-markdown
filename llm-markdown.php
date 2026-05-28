@@ -3,7 +3,7 @@
  * Plugin Name:       LLM Markdown – Expose Content as .md
  * Plugin URI:        https://compiledrogue.com/
  * Description:       Exposes public WordPress content as clean .md routes with front matter, designed for LLMs, AI crawlers, and headless workflows.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Compiled Rogue

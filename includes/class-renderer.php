@@ -555,9 +555,174 @@ final class Renderer {
 				$lines = array_map(static fn($l) => '> ' . rtrim((string) $l), $lines);
 				return implode("\n", $lines) . "\n\n";
 
+			case 'table':
+				return $this->convert_table($node);
+			
+			case 'img':
+				return $this->convert_image($node);
+
 			default:
 				return $this->convert_children($node, $list_depth);
 		}
+	}
+
+	private function convert_image(DOMNode $node): string {
+		if (!$this->settings->should_include_images()) {
+			return '';
+		}
+
+		if (!$node instanceof DOMElement) {
+			return '';
+		}
+
+		$src = $this->get_image_src($node);
+		if ('' === $src) {
+			return '';
+		}
+
+		$alt   = $this->normalize_inline_text((string) $node->getAttribute('alt'));
+		$title = $this->normalize_inline_text((string) $node->getAttribute('title'));
+
+		if ('' === $alt) {
+			$alt = 'Image';
+		}
+
+		$src = esc_url_raw($src);
+		if ('' === $src) {
+			return '';
+		}
+
+		$alt   = $this->escape_markdown_image_text($alt);
+		$title = $this->escape_markdown_image_title($title);
+
+		if ('' !== $title) {
+			return '![' . $alt . '](' . $src . ' "' . $title . '")';
+		}
+
+		return '![' . $alt . '](' . $src . ')';
+	}
+
+	private function get_image_src(DOMElement $node): string {
+		$candidates = [
+			'src',
+			'data-src',
+			'data-lazy-src',
+			'data-original',
+		];
+
+		foreach ($candidates as $attr) {
+			$value = trim((string) $node->getAttribute($attr));
+			if ('' !== $value) {
+				return $value;
+			}
+		}
+
+		return '';
+	}
+
+	private function escape_markdown_image_text(string $text): string {
+		$text = str_replace(['[', ']'], ['\[' , '\]'], $text);
+		$text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
+		$text = preg_replace('/\s+/u', ' ', (string) $text);
+
+		return trim((string) $text);
+	}
+
+	private function escape_markdown_image_title(string $text): string {
+		$text = str_replace('"', '\"', $text);
+		$text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
+		$text = preg_replace('/\s+/u', ' ', (string) $text);
+
+		return trim((string) $text);
+	}
+
+	private function convert_table(DOMNode $table): string {
+		$rows = [];
+
+		foreach ($table->childNodes as $child) {
+			if (XML_ELEMENT_NODE !== $child->nodeType) {
+				continue;
+			}
+
+			$tag = strtolower($child->nodeName);
+
+			if ('thead' === $tag || 'tbody' === $tag || 'tfoot' === $tag) {
+				foreach ($child->childNodes as $section_child) {
+					if (XML_ELEMENT_NODE === $section_child->nodeType && 'tr' === strtolower($section_child->nodeName)) {
+						$rows[] = $this->extract_table_row($section_child);
+					}
+				}
+				continue;
+			}
+
+			if ('tr' === $tag) {
+				$rows[] = $this->extract_table_row($child);
+			}
+		}
+
+		$rows = array_values(array_filter($rows, static function ($row): bool {
+			return is_array($row) && !empty($row);
+		}));
+
+		if (empty($rows)) {
+			return '';
+		}
+
+		$column_count = 0;
+		foreach ($rows as $row) {
+			$column_count = max($column_count, count($row));
+		}
+
+		if ($column_count <= 0) {
+			return '';
+		}
+
+		foreach ($rows as $i => $row) {
+			$rows[$i] = array_pad($row, $column_count, '');
+		}
+
+		$header = array_shift($rows);
+		if (empty($header)) {
+			return '';
+		}
+
+		$out   = [];
+		$out[] = '| ' . implode(' | ', array_map([$this, 'escape_markdown_table_cell'], $header)) . ' |';
+		$out[] = '| ' . implode(' | ', array_fill(0, $column_count, '---')) . ' |';
+
+		foreach ($rows as $row) {
+			$out[] = '| ' . implode(' | ', array_map([$this, 'escape_markdown_table_cell'], $row)) . ' |';
+		}
+
+		return implode("\n", $out) . "\n\n";
+	}
+
+	private function extract_table_row(DOMNode $tr): array {
+		$cells = [];
+
+		foreach ($tr->childNodes as $cell) {
+			if (XML_ELEMENT_NODE !== $cell->nodeType) {
+				continue;
+			}
+
+			$tag = strtolower($cell->nodeName);
+			if ('th' !== $tag && 'td' !== $tag) {
+				continue;
+			}
+
+			$text = $this->normalize_inline_text((string) $cell->textContent);
+			$cells[] = $text;
+		}
+
+		return $cells;
+	}
+
+	private function escape_markdown_table_cell(string $value): string {
+		$value = str_replace('|', '\|', $value);
+		$value = str_replace(["\r\n", "\r", "\n"], '<br>', $value);
+		$value = preg_replace('/\s+/u', ' ', (string) $value);
+
+		return trim((string) $value);
 	}
 
 	private function convert_list(DOMNode $node, bool $ordered, int $depth): string {

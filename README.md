@@ -4,9 +4,9 @@ Donate link: https://www.paypal.com/donate/?hosted_button_id=EUHE8NXYEXJJ6
 Contributors: michaelsablone
 Tags: markdown, llm, ai, headless, content-export
 Requires at least: 6.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -77,6 +77,10 @@ It provides an alternate Markdown representation. Search engine behavior may var
 1. Settings screen (post types and selectors)
 
 == Changelog ==
+
+= 1.0.1 =
+* Added support for tables.
+* Added optional support for images.
 
 = 1.0.0 =
 * Initial release.
