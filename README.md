@@ -1,156 +1,194 @@
-=== LLM Markdown – Expose Content as .md ===
+# LLM Markdown
 
-Donate link: https://www.paypal.com/donate/?hosted_button_id=EUHE8NXYEXJJ6  
-Contributors: michaelsablone
-Tags: markdown, llm, ai, headless, content-export
-Requires at least: 6.0
-Tested up to: 7.0
-Requires PHP: 7.4
-Stable tag: 1.0.2
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Expose supported public WordPress content as clean Markdown at predictable `.md` URLs.
 
-Expose WordPress posts and pages as real .md URLs with YAML front matter for LLMs, AI ingestion, and headless workflows.
+```text
+https://example.com/my-post.md
+```
 
-== Description ==
+LLM Markdown is designed for AI and LLM ingestion, headless or hybrid workflows, and content-export pipelines. It generates Markdown from the rendered front-end page without modifying the original post or maintaining duplicate content.
 
-LLM Markdown gives supported public WordPress content a clean Markdown representation at a predictable `.md` URL. Append `.md` to a post, page, or enabled public post-type URL:
+[Donate to support development](https://www.paypal.com/donate/?hosted_button_id=EUHE8NXYEXJJ6)
 
-`https://example.com/my-post.md`
+## Requirements
 
-The plugin renders the canonical front-end page, selects the part of the document that contains the primary content, removes configured elements, and converts the result to Markdown. Blocks, shortcodes, and other server-rendered content are therefore represented after WordPress and the active theme have processed them. The original post is never changed and no duplicate Markdown post is stored.
+| Requirement | Version |
+| --- | --- |
+| WordPress | 6.0 or later |
+| PHP | 7.4 or later |
+| Tested through | WordPress 7.0 |
+| Plugin version | 1.0.2 |
 
-= Structured Markdown output =
+## How it works
 
-Each document begins with YAML front matter containing the title, post ID, content type, slug, publication and modification dates, canonical URL, Markdown URL, excerpt, and terms from public taxonomies when available.
+The plugin requests the canonical front-end page, selects its primary content container, removes configured elements, and converts the remaining rendered HTML to Markdown. Blocks, shortcodes, and other server-rendered output are represented after WordPress and the active theme have processed them.
 
-The converter handles headings, paragraphs, emphasis, links, ordered and unordered lists, blockquotes, inline and fenced code, horizontal rules, deletion text, figures and captions, and simple tables. Images can be included as an option, with support for common lazy-loading source attributes.
+The resulting document begins with YAML front matter containing:
 
-= Content selection and access control =
+- Title
+- Post ID, type, and slug
+- Publication and modification dates
+- Canonical and Markdown URLs
+- Excerpt
+- Terms from public taxonomies
 
-Choose which public post types expose Markdown. Simple CSS selectors determine the main content container and which elements should be excluded before conversion. Password-protected and non-public content is rejected, and Yoast SEO noindex values can be honored. Developers can apply an additional access-control filter for membership, privacy, or custom publishing rules.
+The body converter handles headings, paragraphs, emphasis, links, ordered and unordered lists, blockquotes, inline and fenced code, horizontal rules, deletion text, figures and captions, simple tables, and optional images.
 
-= Discovery, delivery, and caching =
+## Features
 
-Eligible HTML pages advertise their Markdown counterpart with a `<link rel="alternate" type="text/markdown">` element. Documents generated for anonymous requests are cached for performance and automatically invalidated after relevant settings, theme, or navigation changes; a manual cache control is available under Tools.
+- Dynamic `.md` routes for posts, pages, and enabled public post types
+- YAML front matter with useful document metadata
+- Extraction from fully rendered, server-side HTML
+- Configurable main-content and exclusion selectors
+- Optional image conversion, including common lazy-loading attributes
+- Password-protection and public-visibility checks
+- Optional support for Yoast SEO noindex values
+- Alternate Markdown discovery links in eligible HTML pages
+- Cached anonymous responses with automatic and manual invalidation
+- Advanced, opt-in HTTP content negotiation
+- Extension points for access control, metadata, taxonomies, output, and caching
 
-An advanced, disabled-by-default content-negotiation option can also return Markdown from the normal canonical URL when a client explicitly requests `Accept: text/markdown`. This mode sends `Vary: Accept`, but it should be enabled only after confirming every cache and CDN in front of the site honors that header correctly.
+No Gutenberg lock-in. No content duplication. No custom post type is required.
 
-LLM Markdown has no Gutenberg lock-in, does not duplicate content, and supports public custom post types without requiring one.
+## Installation
 
-== Installation ==
+1. Upload the plugin directory to `/wp-content/plugins/`.
+2. Activate **LLM Markdown** in WordPress.
+3. Open **Settings → Markdown Output**.
+4. Select the content types that should expose Markdown.
+5. Append `.md` to a supported permalink.
 
-1. Upload the plugin folder to `/wp-content/plugins/`
-2. Activate the plugin
-3. Visit Settings → Markdown Output to configure options
+For a static front page, its normal permalink can use `.md`, and `/index.md` is also available as an alias.
 
-After activation, append `.md` to supported post URLs.
+## Configuration
 
-== Frequently Asked Questions ==
+The settings screen is divided into four tabs:
 
-= Does this help LLMs index my content? =
+| Tab | Controls |
+| --- | --- |
+| Options | Content types, noindex handling, images, and response cleanup |
+| DOM & Selectors | Main content selectors and excluded content selectors |
+| Advanced | Header-based Markdown and wildcard Accept-header matching |
+| Tools | Manual Markdown cache invalidation |
 
-It gives crawlers and other clients a predictable, structured Markdown representation and advertises that representation from eligible HTML pages. It cannot guarantee that a particular model, crawler, or search engine will discover, index, or use it.
+### Content selectors
 
-= Does the plugin create physical .md files? =
+The selector fields support a practical CSS subset:
 
-No. The `.md` URLs are WordPress rewrite routes generated on demand. Cached documents are stored temporarily for performance, but the plugin does not create a parallel file tree or require you to synchronize exported files.
+- Element names, IDs, and classes
+- Combined selectors such as `article.entry-content`
+- Descendant selectors
+- Direct-child selectors
+- Comma- or newline-separated alternatives
 
-= Does this modify my content? =
+Attribute selectors, pseudo-classes, and sibling combinators are not supported.
 
-No. It reads the rendered public page and generates a separate response. Posts, blocks, templates, and database content are not rewritten.
+### Header-based Markdown
 
-= Does it support custom post types? =
+Header-based Markdown is an advanced, disabled-by-default option. When enabled, eligible canonical URLs can return Markdown for `GET` and `HEAD` requests that select `text/markdown` through the `Accept` header.
 
-Yes. Any public post type can be enabled under Content Types. Attachments are excluded. Leaving every content type unchecked disables Markdown output entirely.
+```bash
+curl -i -H "Accept: text/html" https://example.com/my-post/
+curl -i -H "Accept: text/markdown" https://example.com/my-post/
+```
 
-= How do I access a static front page? =
+Both eligible HTML and Markdown responses include `Vary: Accept`. Conservative matching requires an explicit `text/markdown` media range. The separate wildcard option can also permit `text/*`; `*/*` alone never selects Markdown.
 
-Append `.md` to its normal permalink. The `/index.md` alias is also available when WordPress is configured to use a static front page.
+> [!WARNING]
+> Content negotiation depends on every CDN, reverse proxy, server cache, and page-cache layer correctly honoring `Vary: Accept`. A misconfigured cache can serve Markdown to browsers or HTML to Markdown clients. Negotiated responses also bypass browser-side JavaScript, analytics, advertising, consent tools, and personalization. Clear every cache and test both representations before enabling this in production.
 
-= Does it expose private content? =
+## Caching
 
-The plugin serves only publicly viewable content from an enabled public post type. Password-protected content is rejected. The optional Honor Noindex setting also rejects posts marked noindex by Yoast SEO, and integrations can impose additional restrictions with the `llm_markdown_can_serve_post` filter.
+Documents generated for anonymous requests are cached for 12 hours by default. Cache generations change automatically after:
 
-= How does the rendered theme affect Markdown? =
+- Plugin settings are saved
+- The active theme is switched
+- A navigation menu is updated
 
-Markdown is built from the server-rendered canonical page, so blocks, shortcodes, and template output can be included. Browser-only content inserted later by JavaScript is not available. Use Main Content Selectors and Excluded Content Selectors when the theme includes navigation, banners, related content, or other unwanted elements around the article.
+Use **Tools → Clear Markdown Cache** after changing templates, widgets, shortcodes, or other site-wide rendered content.
 
-= Which CSS selectors are supported? =
+Developers can use `llm_markdown_cache_ttl` to change the duration or return `0` to disable document caching.
 
-The selector fields intentionally support a practical subset: element names, IDs, classes, combined forms such as `article.entry-content`, descendant selectors, and direct-child selectors. Separate alternatives with commas or new lines. Attribute selectors, pseudo-classes, and sibling combinators are not supported.
+## Frequently asked questions
 
-= Can images be included? =
+### Does this create physical Markdown files?
 
-Yes. Enable Images in Markdown on the Options tab. Images inside the selected content area are converted using their source, alt text, and title; common lazy-loading attributes are recognized. Images are excluded by default.
+No. The `.md` URLs are WordPress rewrite routes generated on demand. Cached documents are temporary; the plugin does not create or synchronize a parallel file tree.
 
-= Is this intended for SEO? =
+### Does it modify WordPress content?
 
-It provides an alternate representation and adds a discovery link to eligible HTML pages, but it makes no ranking or indexing promises. The Markdown response identifies the HTML URL as canonical. Search-engine and AI-crawler behavior varies.
+No. Posts, blocks, templates, and database content are not rewritten.
 
-= Why does unexpected output appear before the Markdown document? =
+### Does it support custom post types?
 
-Some themes, plugins, or hosting layers emit HTML, notices, or other output before `.md` or negotiated Markdown responses. Enable **Response Cleanup** on the Options tab under Settings → Markdown Output to remove that unwanted pre-output. This compatibility option is disabled by default.
+Yes. Any public post type can be enabled. Attachments are excluded. Leaving every content type unchecked disables Markdown output entirely.
 
-If the plugin cannot retrieve or extract the rendered page, it returns a non-cacheable `503 Markdown temporarily unavailable` response rather than caching an empty or incomplete document. Unsupported, disabled, or protected `.md` routes return `404 Not Found`.
+### Does it expose private content?
 
-= Can clients request Markdown from the normal post URL? =
+The plugin serves only publicly viewable content from enabled public post types. Password-protected content is rejected. **Honor Noindex** can additionally reject posts marked noindex by Yoast SEO, and integrations can impose further restrictions through `llm_markdown_can_serve_post`.
 
-Yes. Enable **Header-Based Markdown** on the Advanced tab under Settings → Markdown Output. Supported public post URLs can then return Markdown for `GET` and `HEAD` requests that explicitly prefer `text/markdown`. Both HTML and Markdown responses include `Vary: Accept` so compliant caches can keep the representations separate.
+### How does the active theme affect Markdown?
 
-This is an advanced, disabled-by-default feature. A CDN, proxy, server cache, or page-cache plugin that does not honor `Vary: Accept` may serve the wrong representation. Negotiated Markdown also bypasses browser-side analytics and JavaScript. Clear every cache and test both representations after enabling it.
+Markdown is built from the server-rendered canonical page, so blocks, shortcodes, and template output can be included. Content inserted later by browser-side JavaScript is unavailable. Adjust the main and excluded selectors if a theme includes navigation, banners, related content, or other unwanted elements around the article.
 
-Conservative matching requires an explicit `text/markdown` media range. The separate **Wildcard Accept Headers** option can also permit `text/*`; `*/*` alone never requests Markdown.
+### Can images be included?
 
-Test HTML:
+Yes. Enable **Images in Markdown** under Options. Images inside the selected content area use their source, alt text, and title; common lazy-loading attributes are recognized. Images are excluded by default.
 
-`curl -i -H "Accept: text/html" https://example.com/my-post/`
+### Why does unexpected output appear before Markdown?
 
-Test Markdown:
+Some themes, plugins, or hosting layers emit HTML, notices, or other output before the Markdown document. Enable **Response Cleanup** under Options to remove that pre-output. This compatibility option is disabled by default.
 
-`curl -i -H "Accept: text/markdown" https://example.com/my-post/`
+### What happens when rendering fails?
 
-= How do I refresh cached Markdown after changing my theme or site layout? =
+If the plugin cannot retrieve or extract the rendered page, it returns a non-cacheable `503 Markdown temporarily unavailable` response instead of caching incomplete output. Unsupported, disabled, or protected `.md` routes return `404 Not Found`.
 
-Use **Clear Markdown Cache** on the Tools tab under Settings → Markdown Output after changing templates, navigation, widgets, shortcodes, or other content that affects the rendered page. Saving the plugin settings, switching themes, and updating navigation menus also invalidate the Markdown cache automatically.
+### Does this guarantee AI or search-engine indexing?
 
-Developers can use the `llm_markdown_cache_ttl` filter to change the default 12-hour cache duration or return `0` to disable document caching.
+No. The plugin provides and advertises a predictable alternate representation, but individual crawlers and search engines decide whether to discover, index, or use it. The Markdown response identifies the HTML URL as canonical.
 
-= What developer filters are available? =
+## Developer filters
 
-Use `llm_markdown_can_serve_post` for access rules, `llm_markdown_is_noindex_post` for additional noindex providers, `llm_markdown_include_taxonomy` to control public taxonomy fields, `llm_markdown_front_matter` to modify metadata, `llm_markdown_markdown_document` to filter the completed document, and `llm_markdown_cache_ttl` to control caching.
+| Filter | Purpose |
+| --- | --- |
+| `llm_markdown_can_serve_post` | Apply membership, privacy, or custom access rules |
+| `llm_markdown_is_noindex_post` | Integrate additional noindex providers |
+| `llm_markdown_include_taxonomy` | Include or exclude public taxonomy data |
+| `llm_markdown_front_matter` | Modify YAML front matter |
+| `llm_markdown_markdown_document` | Filter the completed Markdown document |
+| `llm_markdown_cache_ttl` | Change or disable document caching |
 
-= What happens to plugin data when I remove it? =
+## Removal
 
-Deactivation preserves settings. Uninstalling or deleting the plugin removes its settings, cache-generation option, and generated Markdown transients. On multisite, cleanup runs for every site in the network.
+Deactivation preserves settings. Uninstalling or deleting the plugin removes its settings, cache-generation state, and generated Markdown transients. On multisite, cleanup runs for every site in the network.
 
-== Screenshots ==
+## Changelog
 
-1. Basic Settings Panel
-2. DOM & Selectors Settings Panel
-3. Advanced Settings Panel
-4. Tools Settings Panel
+### 1.0.2
 
-== Changelog ==
+- Added advanced, opt-in Markdown content negotiation for normal singular URLs using `Accept: text/markdown`.
+- Added quality-aware Accept-header matching, optional `text/*` support, `GET`/`HEAD` restrictions, and `Vary: Accept` signaling.
+- Added a disabled-by-default Response Cleanup option for unexpected early output.
+- Reorganized settings into Options, DOM & Selectors, Advanced, and Tools tabs.
+- Added manual cache invalidation and automatic generation changes after settings, theme, and navigation updates.
+- Added the `llm_markdown_cache_ttl` filter and more complete cache keys.
+- Changed failed or empty loopback renders to return a non-cacheable 503 response.
+- Added `llm_markdown_can_serve_post` for access-control integrations.
+- Restricted front-matter taxonomy data to public taxonomies and added `llm_markdown_include_taxonomy`.
+- Allowed an empty content-type selection to disable Markdown output.
+- Fixed HTML entity decoding and code delimiters when source code contains backticks.
+- Added horizontal rules, deletion text, figures, and captions, and made simple tables safer.
+- Expanded uninstall cleanup across single-site and multisite installations.
 
-= 1.0.2 =
-* Added advanced, opt-in Markdown content negotiation for normal singular URLs using `Accept: text/markdown`.
-* Added quality-aware Accept-header matching, optional `text/*` support, GET/HEAD restrictions, and `Vary: Accept` signaling for eligible HTML and Markdown responses.
-* Added a disabled-by-default Response Cleanup option for unwanted output emitted before Markdown and Markdown-route error responses.
-* Reorganized the settings screen into Options, DOM & Selectors, Advanced, and Tools tabs with clearer labels, guidance, and operational warnings.
-* Added manual cache invalidation and automatic generation changes after settings updates, theme switches, and navigation-menu updates.
-* Added the `llm_markdown_cache_ttl` filter and expanded cache keys to account for conversion version, relevant options, site, locale, and content modification time.
-* Changed failed or empty loopback renders to return a non-cacheable 503 response instead of caching incomplete output.
-* Added `llm_markdown_can_serve_post` for membership and access-control integrations.
-* Restricted front-matter taxonomy data to public taxonomies and added `llm_markdown_include_taxonomy` for further control.
-* Allowed an intentionally empty content-type selection to disable all Markdown output.
-* Fixed HTML entity decoding and Markdown code delimiters when source code contains backticks.
-* Added Markdown conversion for horizontal rules, deletion text, figures, and figure captions, and made simple table output safer for uneven rows and pipe characters.
-* Expanded uninstall cleanup to remove all plugin options and generated Markdown transients across single-site and multisite installations.
+### 1.0.1
 
-= 1.0.1 =
-* Added support for tables.
-* Added optional support for images.
+- Added support for tables.
+- Added optional support for images.
 
-= 1.0.0 =
-* Initial release.
+### 1.0.0
+
+- Initial release.
+
+## License
+
+LLM Markdown is licensed under the [GNU General Public License v2.0 or later](https://www.gnu.org/licenses/gpl-2.0.html).
