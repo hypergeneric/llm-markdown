@@ -129,7 +129,6 @@ Deactivation preserves settings. Uninstalling or deleting the plugin removes its
 1. Basic Settings Panel
 2. DOM & Selectors Settings Panel
 3. Advanced Settings Panel
-4. Tools Settings Panel
 
 == Changelog ==
 
