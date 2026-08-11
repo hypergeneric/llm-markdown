@@ -46,15 +46,15 @@ function llm_markdown_delete_site_data(): void {
 }
 
 if (is_multisite()) {
-	$site_ids = get_sites(
+	$llm_markdown_site_ids = get_sites(
 		[
 			'fields' => 'ids',
 			'number' => 0,
 		]
 	);
 
-	foreach ($site_ids as $site_id) {
-		switch_to_blog((int) $site_id);
+	foreach ($llm_markdown_site_ids as $llm_markdown_site_id) {
+		switch_to_blog((int) $llm_markdown_site_id);
 		llm_markdown_delete_site_data();
 		restore_current_blog();
 	}
