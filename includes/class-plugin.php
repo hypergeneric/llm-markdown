@@ -18,6 +18,7 @@ final class Plugin {
 	private Renderer $renderer;
 
 	private bool $hooks_registered = false;
+	private int $markdown_buffer_level = 0;
 
 	private function __construct() {
 		$this->settings = Settings::instance();
@@ -48,13 +49,43 @@ final class Plugin {
 		$this->settings->register_hooks();
 
 		add_action('init', [$this, 'register_rewrite_rules'], 10);
+		if ($this->settings->should_discard_early_output()) {
+			add_action('init', [$this, 'maybe_start_markdown_output_buffer'], 0);
+		}
 		add_filter('query_vars', [$this, 'register_query_vars']);
 		add_action('template_redirect', [$this, 'maybe_serve_markdown'], 0);
+		if ($this->settings->should_enable_content_negotiation()) {
+			// Run after WordPress canonical redirects at priority 10.
+			add_action('template_redirect', [$this, 'maybe_serve_negotiated_markdown'], 11);
+		}
 		add_action('wp_head', [$this, 'output_alternate_link'], 1);
 		add_action('pre_get_posts', [$this, 'harden_render_source_query'], 0);
 		add_filter('redirect_canonical', [$this, 'maybe_disable_canonical_redirect'], 0, 2);
+		add_action('update_option_' . Settings::OPTION_NAME, [Renderer::class, 'bump_cache_generation'], 10, 0);
+		add_action('switch_theme', [Renderer::class, 'bump_cache_generation'], 10, 0);
+		add_action('wp_update_nav_menu', [Renderer::class, 'bump_cache_generation'], 10, 0);
 
 		$this->hooks_registered = true;
+	}
+
+	public function maybe_start_markdown_output_buffer(): void {
+		$request_uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI'])) : '';
+		if ('' === $request_uri) {
+			return;
+		}
+
+		$path              = wp_parse_url($request_uri, PHP_URL_PATH);
+		$is_markdown_path  = is_string($path) && '.md' === substr(untrailingslashit($path), -3);
+		$is_negotiated     = $this->settings->should_enable_content_negotiation()
+			&& $this->is_safe_request_method()
+			&& $this->request_prefers_markdown();
+
+		if (!$is_markdown_path && !$is_negotiated) {
+			return;
+		}
+
+		ob_start();
+		$this->markdown_buffer_level = ob_get_level();
 	}
 
 	/**
@@ -158,6 +189,38 @@ final class Plugin {
 		$this->send_markdown($post);
 	}
 
+	public function maybe_serve_negotiated_markdown(): void {
+		if (!$this->is_safe_request_method()) {
+			return;
+		}
+
+		if (is_admin() || wp_doing_ajax() || wp_doing_cron() || $this->is_rest_request()) {
+			return;
+		}
+
+		if ($this->is_render_source_request() || is_feed() || is_preview() || is_trackback() || is_embed()) {
+			return;
+		}
+
+		if (!is_singular()) {
+			return;
+		}
+
+		$post = get_queried_object();
+		if (!$post instanceof WP_Post || !$this->can_serve_post($post)) {
+			return;
+		}
+
+		// Both representations must vary so caches do not reuse HTML for Markdown or vice versa.
+		$this->add_vary_accept_header();
+
+		if (!$this->request_prefers_markdown()) {
+			return;
+		}
+
+		$this->send_markdown($post);
+	}
+
 	public function output_alternate_link(): void {
 		if (!is_singular() || $this->is_markdown_route_request()) {
 			return;
@@ -203,6 +266,136 @@ final class Plugin {
 		$rest_prefix = '/' . trailingslashit(rest_get_url_prefix());
 
 		return false !== strpos($request_uri, $rest_prefix);
+	}
+
+	private function is_safe_request_method(): bool {
+		$method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD'])) : 'get';
+		return in_array(strtoupper($method), ['GET', 'HEAD'], true);
+	}
+
+	private function request_prefers_markdown(): bool {
+		$accept = isset($_SERVER['HTTP_ACCEPT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ACCEPT'])) : '';
+		if ('' === $accept) {
+			return false;
+		}
+
+		$ranges = $this->parse_accept_header($accept);
+		if (empty($ranges)) {
+			return false;
+		}
+
+		$markdown            = $this->media_quality($ranges, 'text', 'markdown');
+		$html                = $this->media_quality($ranges, 'text', 'html');
+		$minimum_specificity = $this->settings->should_accept_markdown_wildcards() ? 1 : 2;
+
+		return $markdown['specificity'] >= $minimum_specificity
+			&& $markdown['quality'] > 0.0
+			&& $markdown['quality'] >= max(0.0, $html['quality']);
+	}
+
+	/**
+	 * @return array<int, array{type: string, subtype: string, quality: float}>
+	 */
+	private function parse_accept_header(string $accept): array {
+		$ranges = [];
+
+		foreach (explode(',', $accept) as $value) {
+			$parts = array_map('trim', explode(';', $value));
+			$media = strtolower((string) array_shift($parts));
+			if (!preg_match('~^([a-z0-9!#$&^_.+*-]+)/([a-z0-9!#$&^_.+*-]+)$~i', $media, $matches)) {
+				continue;
+			}
+
+			$quality = 1.0;
+			$valid   = true;
+			foreach ($parts as $parameter) {
+				if (!preg_match('/^q\s*=\s*(.+)$/i', $parameter, $quality_match)) {
+					continue;
+				}
+
+				$quality_value = trim((string) $quality_match[1]);
+				if (!preg_match('/^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/', $quality_value)) {
+					$valid = false;
+					break;
+				}
+
+				$quality = (float) $quality_value;
+			}
+
+			if (!$valid) {
+				continue;
+			}
+
+			$ranges[] = [
+				'type'    => strtolower((string) $matches[1]),
+				'subtype' => strtolower((string) $matches[2]),
+				'quality' => $quality,
+			];
+		}
+
+		return $ranges;
+	}
+
+	/**
+	 * @param array<int, array{type: string, subtype: string, quality: float}> $ranges
+	 * @return array{quality: float, specificity: int}
+	 */
+	private function media_quality(array $ranges, string $type, string $subtype): array {
+		$best = [
+			'quality'     => -1.0,
+			'specificity' => -1,
+		];
+
+		foreach ($ranges as $range) {
+			$specificity = -1;
+			if ($type === $range['type'] && $subtype === $range['subtype']) {
+				$specificity = 2;
+			} elseif ($type === $range['type'] && '*' === $range['subtype']) {
+				$specificity = 1;
+			} elseif ('*' === $range['type'] && '*' === $range['subtype']) {
+				$specificity = 0;
+			}
+			if ($specificity < 0) {
+				continue;
+			}
+
+			if ($specificity > $best['specificity'] || ($specificity === $best['specificity'] && $range['quality'] > $best['quality'])) {
+				$best = [
+					'quality'     => $range['quality'],
+					'specificity' => $specificity,
+				];
+			}
+		}
+
+		return $best;
+	}
+
+	private function add_vary_accept_header(): void {
+		if (headers_sent()) {
+			return;
+		}
+
+		$vary = [];
+		foreach (headers_list() as $header_line) {
+			if (0 !== stripos($header_line, 'Vary:')) {
+				continue;
+			}
+
+			$values = explode(',', trim(substr($header_line, 5)));
+			foreach ($values as $value) {
+				$value = trim($value);
+				if ('*' === $value) {
+					return;
+				}
+				if ('' !== $value) {
+					$vary[strtolower($value)] = $value;
+				}
+			}
+		}
+
+		$vary['accept'] = 'Accept';
+		header_remove('Vary');
+		header('Vary: ' . implode(', ', array_values($vary)));
 	}
 
 	private function resolve_markdown_route_post(): ?WP_Post {
@@ -266,7 +459,7 @@ final class Plugin {
 			return false;
 		}
 
-		return true;
+		return (bool) apply_filters('llm_markdown_can_serve_post', true, $post);
 	}
 
 	private function is_noindex(WP_Post $post): bool {
@@ -287,7 +480,13 @@ final class Plugin {
 		$md_url = $this->build_markdown_url($canonical);
 
 		$document = $this->renderer->render_post($post, $canonical, $md_url);
+		if ('' === $document) {
+			$this->send_unavailable();
+		}
+
 		$document = (string) apply_filters('llm_markdown_markdown_document', $document, $post);
+
+		$this->discard_early_output();
 
 		status_header(200);
 		header_remove('Content-Type');
@@ -299,12 +498,28 @@ final class Plugin {
 		exit;
 	}
 
+	private function send_unavailable(): void {
+		$this->discard_early_output();
+
+		status_header(503);
+		header_remove('Content-Type');
+		header('Content-Type: text/plain; charset=' . get_bloginfo('charset'));
+		header('Cache-Control: no-store');
+		header('Retry-After: 60');
+		header('X-Content-Type-Options: nosniff');
+
+		echo esc_html__('Markdown temporarily unavailable', 'llm-markdown');
+		exit;
+	}
+
 	private function send_not_found(): void {
 		global $wp_query;
 
 		if ($wp_query instanceof WP_Query) {
 			$wp_query->set_404();
 		}
+
+		$this->discard_early_output();
 
 		status_header(404);
 		header_remove('Content-Type');
@@ -313,6 +528,19 @@ final class Plugin {
 
 		echo esc_html__('Not Found', 'llm-markdown');
 		exit;
+	}
+
+	private function discard_early_output(): void {
+		while ($this->markdown_buffer_level > 0 && ob_get_level() >= $this->markdown_buffer_level) {
+			$status = ob_get_status();
+			if (!is_array($status) || !isset($status['flags']) || 0 === ($status['flags'] & PHP_OUTPUT_HANDLER_REMOVABLE)) {
+				break;
+			}
+
+			ob_end_clean();
+		}
+
+		$this->markdown_buffer_level = 0;
 	}
 
 	private function build_markdown_url(string $canonical_url): string {

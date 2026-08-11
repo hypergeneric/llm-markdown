@@ -9,13 +9,17 @@ use DOMElement;
 use DOMNode;
 use DOMXPath;
 use WP_Post;
+use WP_Taxonomy;
 
 if (!defined('ABSPATH')) {
 	exit;
 }
 
 final class Renderer {
+	public const CACHE_GENERATION_OPTION = 'llm_markdown_cache_generation';
+
 	private const CACHE_TTL = 12 * HOUR_IN_SECONDS;
+	private const CACHE_VERSION = 2;
 
 	private Settings $settings;
 
@@ -23,18 +27,32 @@ final class Renderer {
 		$this->settings = $settings;
 	}
 
+	public static function bump_cache_generation(): void {
+		$generation = max(1, (int) get_option(self::CACHE_GENERATION_OPTION, 1));
+		update_option(self::CACHE_GENERATION_OPTION, $generation + 1, false);
+	}
+
 	public function render_post(WP_Post $post, string $canonical_url, string $markdown_url): string {
 		$cache_key = $this->cache_key($post);
+		$cache_ttl = (int) apply_filters('llm_markdown_cache_ttl', self::CACHE_TTL, $post);
 
-		if (!is_user_logged_in()) {
+		if (!is_user_logged_in() && $cache_ttl > 0) {
 			$cached = get_transient($cache_key);
 			if (is_string($cached) && '' !== $cached) {
 				return $cached;
 			}
 		}
 
-		$html     = $this->fetch_rendered_html($canonical_url);
+		$html = $this->fetch_rendered_html($canonical_url);
+		if ('' === trim($html)) {
+			return '';
+		}
+
 		$doc_html = $this->extract_document_html($html);
+		if ('' === trim($doc_html)) {
+			return '';
+		}
+
 		$md_body  = $this->html_to_markdown($doc_html);
 
 		$front_matter = $this->build_front_matter($post, $canonical_url, $markdown_url);
@@ -42,8 +60,8 @@ final class Renderer {
 
 		$document = "---\n" . $this->yaml($front_matter) . "---\n\n" . trim($md_body) . "\n";
 
-		if (!is_user_logged_in()) {
-			set_transient($cache_key, $document, self::CACHE_TTL);
+		if (!is_user_logged_in() && $cache_ttl > 0) {
+			set_transient($cache_key, $document, $cache_ttl);
 		}
 
 		return $document;
@@ -51,13 +69,15 @@ final class Renderer {
 
 	private function cache_key(WP_Post $post): string {
 		$options_hash = md5((string) wp_json_encode([
-			'root'   => $this->settings->get_document_root_selector(),
-			'ignore' => $this->settings->get_ignore_selectors(),
-			'v'      => 1,
+			'root'           => $this->settings->get_document_root_selector(),
+			'ignore'         => $this->settings->get_ignore_selectors(),
+			'include_images' => $this->settings->should_include_images(),
+			'v'              => self::CACHE_VERSION,
 		]));
 
 		$parts = [
 			(string) get_current_blog_id(),
+			(string) max(1, (int) get_option(self::CACHE_GENERATION_OPTION, 1)),
 			(string) $post->ID,
 			(string) $post->post_modified_gmt,
 			(string) get_locale(),
@@ -517,13 +537,11 @@ final class Renderer {
 				if ($node->parentNode instanceof DOMNode && 'pre' === strtolower($node->parentNode->nodeName)) {
 					return $this->normalize_code((string) $node->textContent);
 				}
-				$text = trim($this->convert_children($node, $list_depth));
-				$text = str_replace('`', '\`', $text);
-				return ('' === $text) ? '' : '`' . $text . '`';
+				return $this->convert_inline_code((string) $node->textContent);
 
 			case 'pre':
 				$text = $this->normalize_code((string) $node->textContent);
-				return ('' === $text) ? '' : "```\n" . $text . "\n```\n\n";
+				return $this->convert_fenced_code($text);
 
 			case 'a':
 				$href = ($node instanceof DOMElement) ? trim((string) $node->getAttribute('href')) : '';
@@ -555,6 +573,23 @@ final class Renderer {
 				$lines = array_map(static fn($l) => '> ' . rtrim((string) $l), $lines);
 				return implode("\n", $lines) . "\n\n";
 
+			case 'hr':
+				return "---\n\n";
+
+			case 'del':
+			case 's':
+			case 'strike':
+				$text = trim($this->convert_children($node, $list_depth));
+				return ('' === $text) ? '' : '~~' . $text . '~~';
+
+			case 'figure':
+				$text = trim($this->convert_children($node, $list_depth));
+				return ('' === $text) ? '' : $text . "\n\n";
+
+			case 'figcaption':
+				$text = trim($this->convert_children($node, $list_depth));
+				return ('' === $text) ? '' : "\n\n" . $text . "\n";
+
 			case 'table':
 				return $this->convert_table($node);
 			
@@ -564,6 +599,46 @@ final class Renderer {
 			default:
 				return $this->convert_children($node, $list_depth);
 		}
+	}
+
+	private function convert_inline_code(string $text): string {
+		$text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
+		$text = preg_replace('/[ \t]+/u', ' ', $text);
+		$text = trim((string) $text);
+		if ('' === $text) {
+			return '';
+		}
+
+		$fence_length = $this->longest_character_run($text, '`') + 1;
+		$fence        = str_repeat('`', max(1, $fence_length));
+		$padding      = ('`' === substr($text, 0, 1) || '`' === substr($text, -1)) ? ' ' : '';
+
+		return $fence . $padding . $text . $padding . $fence;
+	}
+
+	private function convert_fenced_code(string $text): string {
+		if ('' === $text) {
+			return '';
+		}
+
+		$fence_length = max(3, $this->longest_character_run($text, '`') + 1);
+		$fence        = str_repeat('`', $fence_length);
+
+		return $fence . "\n" . $text . "\n" . $fence . "\n\n";
+	}
+
+	private function longest_character_run(string $text, string $character): int {
+		$pattern = '/' . preg_quote($character, '/') . '+/';
+		if (!preg_match_all($pattern, $text, $matches)) {
+			return 0;
+		}
+
+		$longest = 0;
+		foreach ($matches[0] as $match) {
+			$longest = max($longest, strlen((string) $match));
+		}
+
+		return $longest;
 	}
 
 	private function convert_image(DOMNode $node): string {
@@ -769,21 +844,18 @@ final class Renderer {
 	}
 
 	private function normalize_inline_text(string $text): string {
-		$text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 		$text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
 		$text = preg_replace('/\s+/u', ' ', (string) $text);
 		return trim((string) $text);
 	}
 
 	private function normalize_text(string $text): string {
-		$text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 		$text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
 		$text = preg_replace('/\s+/u', ' ', $text);
 		return (string) $text;
 	}
 
 	private function normalize_code(string $text): string {
-		$text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 		$text = str_replace(["\r\n", "\r"], "\n", $text);
 		return trim($text, "\n");
 	}
@@ -825,18 +897,21 @@ final class Renderer {
 			$data['excerpt'] = (string) $excerpt;
 		}
 
-		$taxes = get_object_taxonomies($post->post_type, 'names');
+		$taxes = get_object_taxonomies($post->post_type, 'objects');
 		foreach ($taxes as $tax) {
-			if (!taxonomy_exists($tax)) {
+			if (!$tax instanceof WP_Taxonomy || !$tax->public) {
+				continue;
+			}
+			if (!(bool) apply_filters('llm_markdown_include_taxonomy', true, $tax, $post)) {
 				continue;
 			}
 
-			$names = wp_get_post_terms($post->ID, $tax, ['fields' => 'names']);
+			$names = wp_get_post_terms($post->ID, $tax->name, ['fields' => 'names']);
 			if (is_wp_error($names) || empty($names)) {
 				continue;
 			}
 
-			$key = 'taxonomy_' . $this->yaml_key((string) $tax);
+			$key = 'taxonomy_' . $this->yaml_key($tax->name);
 			$data[$key] = array_values(array_unique(array_map('strval', $names)));
 		}
 
