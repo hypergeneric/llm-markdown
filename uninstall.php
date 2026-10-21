@@ -17,6 +17,7 @@ function llm_markdown_delete_site_data(): void {
 
 	delete_option('llm_markdown_settings');
 	delete_option('llm_markdown_cache_generation');
+	delete_post_meta_by_key('_llm_markdown_disabled');
 
 	$value_pattern   = $wpdb->esc_like('_transient_llm_markdown_') . '%';
 	$timeout_pattern = $wpdb->esc_like('_transient_timeout_llm_markdown_') . '%';

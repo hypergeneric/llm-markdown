@@ -32,6 +32,123 @@ final class Renderer {
 		update_option(self::CACHE_GENERATION_OPTION, $generation + 1, false);
 	}
 
+	public function invalidate_post(WP_Post $post): void {
+		delete_transient($this->cache_key($post));
+	}
+
+	/**
+	 * Test the configured content selectors against a rendered front-end URL.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function diagnose_extraction(string $canonical_url): array {
+		$html = $this->fetch_rendered_html($canonical_url);
+		if ('' === trim($html)) {
+			return [
+				'success' => false,
+				'message' => __('The rendered HTML could not be retrieved.', 'llm-markdown'),
+			];
+		}
+
+		$dom = $this->load_html_document($html);
+		if (!$dom instanceof DOMDocument) {
+			return [
+				'success' => false,
+				'message' => __('The rendered HTML could not be parsed.', 'llm-markdown'),
+			];
+		}
+
+		$xpath      = new DOMXPath($dom);
+		$configured = (string) $this->settings->get_document_root_selector();
+		$selectors  = preg_split('/[,\r\n]+/', $configured, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+		$selectors  = array_values(array_filter(array_map('trim', $selectors)));
+		$results    = [];
+		$root       = null;
+		$matched    = '';
+		$matches    = 0;
+
+		foreach ($selectors as $selector) {
+			$expression = $this->css_to_xpath($selector);
+			$list       = ('' !== $expression) ? $xpath->query($expression) : false;
+			$count      = (false !== $list) ? $list->length : null;
+			$selected   = null === $root && is_int($count) && $count > 0;
+
+			if ($selected) {
+				$node = $list->item(0);
+				if ($node instanceof DOMNode) {
+					$root    = $node;
+					$matched = $selector;
+					$matches = $count;
+				} else {
+					$selected = false;
+				}
+			}
+
+			$results[] = [
+				'selector' => $selector,
+				'valid'    => false !== $list,
+				'matches'  => $count,
+				'selected' => $selected,
+			];
+		}
+
+		$fallback = '';
+		foreach (['main', 'article'] as $fallback_selector) {
+			if ($root instanceof DOMNode) {
+				break;
+			}
+
+			$expression = $this->css_to_xpath($fallback_selector);
+			$list       = ('' !== $expression) ? $xpath->query($expression) : false;
+			if (false !== $list && $list->length > 0) {
+				$node = $list->item(0);
+				if ($node instanceof DOMNode) {
+					$root     = $node;
+					$fallback = $fallback_selector;
+					$matches  = $list->length;
+				}
+			}
+		}
+		if (!$root instanceof DOMNode) {
+			$body_nodes = $xpath->query('//body');
+			if (false !== $body_nodes && $body_nodes->length > 0) {
+				$node = $body_nodes->item(0);
+				if ($node instanceof DOMNode) {
+					$root     = $node;
+					$fallback = 'body';
+					$matches  = $body_nodes->length;
+				}
+			}
+		}
+
+		if (!$root instanceof DOMNode) {
+			return [
+				'success'    => false,
+				'message'    => __('No extractable content container was found.', 'llm-markdown'),
+				'configured' => $configured,
+				'selectors'  => $results,
+			];
+		}
+
+		$this->filter_content_root($xpath, $root);
+		$markdown = $this->html_to_markdown(trim($this->inner_html($root)));
+		$preview  = mb_substr($markdown, 0, 500);
+		if (mb_strlen($markdown) > 500) {
+			$preview = rtrim($preview) . '…';
+		}
+
+		return [
+			'success'          => true,
+			'configured'       => $configured,
+			'selectors'        => $results,
+			'matched_selector' => '' !== $fallback ? $fallback : $matched,
+			'match_count'      => $matches,
+			'element'          => $this->describe_node($root),
+			'fallback'         => $fallback,
+			'markdown_preview' => $preview,
+		];
+	}
+
 	public function render_post(WP_Post $post, string $canonical_url, string $markdown_url): string {
 		$cache_key = $this->cache_key($post);
 		$cache_ttl = (int) apply_filters('llm_markdown_cache_ttl', self::CACHE_TTL, $post);
@@ -105,7 +222,7 @@ final class Renderer {
 				'Accept'               => 'text/html,application/xhtml+xml',
 				'X-LLMMD-Render-Source' => '1',
 			],
-			'user-agent'         => 'LLMMD/1.0.0',
+			'user-agent'         => 'LLMMD/1.1.0',
 		]);
 
 		if (is_wp_error($response)) {
@@ -127,26 +244,8 @@ final class Renderer {
 	}
 
 	private function extract_document_html(string $html): string {
-		if ('' === trim($html) || !class_exists(DOMDocument::class)) {
-			return '';
-		}
-
-		$dom = new DOMDocument('1.0', 'UTF-8');
-
-		$flags = 0;
-		if (defined('LIBXML_HTML_NOIMPLIED')) {
-			$flags |= LIBXML_HTML_NOIMPLIED;
-		}
-		if (defined('LIBXML_HTML_NODEFDTD')) {
-			$flags |= LIBXML_HTML_NODEFDTD;
-		}
-
-		$prev   = libxml_use_internal_errors(true);
-		$loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, $flags);
-		libxml_clear_errors();
-		libxml_use_internal_errors($prev);
-
-		if (!$loaded) {
+		$dom = $this->load_html_document($html);
+		if (!$dom instanceof DOMDocument) {
 			return '';
 		}
 
@@ -166,6 +265,12 @@ final class Renderer {
 			return '';
 		}
 
+		$this->filter_content_root($xpath, $root);
+
+		return trim($this->inner_html($root));
+	}
+
+	private function filter_content_root(DOMXPath $xpath, DOMNode $root): void {
 		// Always ignore these.
 		$this->remove_by_selectors($xpath, $root, 'script,style,noscript,template');
 
@@ -174,8 +279,47 @@ final class Renderer {
 		if ('' !== $ignore) {
 			$this->remove_by_selectors($xpath, $root, $ignore);
 		}
+	}
 
-		return trim($this->inner_html($root));
+	private function load_html_document(string $html): ?DOMDocument {
+		if ('' === trim($html) || !class_exists(DOMDocument::class)) {
+			return null;
+		}
+
+		$dom   = new DOMDocument('1.0', 'UTF-8');
+		$flags = 0;
+		if (defined('LIBXML_HTML_NOIMPLIED')) {
+			$flags |= LIBXML_HTML_NOIMPLIED;
+		}
+		if (defined('LIBXML_HTML_NODEFDTD')) {
+			$flags |= LIBXML_HTML_NODEFDTD;
+		}
+
+		$prev   = libxml_use_internal_errors(true);
+		$loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, $flags);
+		libxml_clear_errors();
+		libxml_use_internal_errors($prev);
+
+		return $loaded ? $dom : null;
+	}
+
+	private function describe_node(DOMNode $node): string {
+		if (!$node instanceof DOMElement) {
+			return $node->nodeName;
+		}
+
+		$description = strtolower($node->tagName);
+		$id          = trim($node->getAttribute('id'));
+		if ('' !== $id) {
+			$description .= '#' . $id;
+		}
+
+		$classes = preg_split('/\s+/', trim($node->getAttribute('class')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+		if (!empty($classes)) {
+			$description .= '.' . implode('.', $classes);
+		}
+
+		return $description;
 	}
 
 	private function select_first(DOMXPath $xpath, string $css_selector): ?DOMNode {

@@ -1,0 +1,151 @@
+.llmmd-status {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.llmmd-status__dot {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: #8c8f94;
+}
+
+.llmmd-status--available .llmmd-status__dot {
+	background: #00a32a;
+}
+
+.llmmd-status--unavailable .llmmd-status__dot,
+.llmmd-status--error .llmmd-status__dot {
+	background: #d63638;
+}
+
+.llmmd-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.llmmd-editor-panel__content .llmmd-actions {
+	padding-bottom: 8px;
+}
+
+.llmmd-actions .button {
+	margin: 0;
+}
+
+.llmmd-editor-panel__content {
+	padding: 16px;
+}
+
+.llmmd-editor-panel__summary {
+	width: 100%;
+	margin: 0 0 16px;
+	border: 1px solid #ddd;
+	border-collapse: collapse;
+}
+
+.llmmd-editor-panel__summary th,
+.llmmd-editor-panel__summary td {
+	padding: 9px 10px;
+	border-bottom: 1px solid #ddd;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.llmmd-editor-panel__summary tr:last-child th,
+.llmmd-editor-panel__summary tr:last-child td {
+	border-bottom: 0;
+}
+
+.llmmd-editor-panel__summary th {
+	width: 52%;
+	color: #646970;
+	font-weight: 400;
+}
+
+
+.llmmd-editor-panel__summary td {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.llmmd-editor-panel__pill {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: #f0f0f1;
+	color: #50575e;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.llmmd-editor-panel__pill--available,
+.llmmd-editor-panel__pill--extracted {
+	background: #edfaef;
+	color: #006b1b;
+}
+
+.llmmd-editor-panel__pill--checking {
+	background: #f0f6fc;
+	color: #135e96;
+}
+
+.llmmd-editor-panel__pill--unavailable {
+	background: #fcf0c3;
+	color: #614200;
+}
+
+.llmmd-editor-panel__pill--error {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.llmmd-editor-panel__message {
+	margin: 0 0 16px;
+	color: #646970;
+}
+
+.llmmd-editor-panel__message--error {
+	color: #b32d2e;
+}
+
+.llmmd-editor-panel__feedback {
+	margin: 8px 0 0;
+	color: #50575e;
+}
+
+.llmmd-editor-panel__preview,
+.llmmd-classic-preview {
+	margin: 12px 0;
+}
+
+.llmmd-editor-panel__preview pre,
+.llmmd-classic-preview pre {
+	max-height: 24em;
+	margin: 6px 0 0;
+	padding: 10px;
+	overflow: auto;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre;
+}
+
+.llmmd-editor-panel__footnote {
+	margin: 16px 0 0;
+	color: #646970;
+	font-size: 12px;
+}
+
+.llmmd-editor-panel__exclusion {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid #ddd;
+}
+
+.llmmd-editor-panel__exclusion .components-base-control {
+	margin-bottom: 0;
+}

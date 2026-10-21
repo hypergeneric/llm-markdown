@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       LLM Markdown – Expose Content as .md
+ * Plugin Name:       LLM Markdown – Markdown Endpoints for AI Agents
  * Plugin URI:        https://compiledrogue.com/
- * Description:       Exposes public WordPress content as clean .md routes with front matter, designed for LLMs, AI crawlers, and headless workflows.
- * Version:           1.0.2
+ * Description:       Serves clean Markdown versions of WordPress posts, pages, and custom post types for AI agents, LLM tools, and content pipelines.
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Compiled Rogue
@@ -25,6 +25,7 @@ define('LLMMD_URL', plugin_dir_url(__FILE__));
 
 require_once LLMMD_PATH . 'includes/class-settings.php';
 require_once LLMMD_PATH . 'includes/class-renderer.php';
+require_once LLMMD_PATH . 'includes/class-editor-tools.php';
 require_once LLMMD_PATH . 'includes/class-plugin.php';
 
 register_activation_hook(LLMMD_FILE, ['\LLM_Markdown\Plugin', 'activate']);
