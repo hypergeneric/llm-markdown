@@ -134,9 +134,12 @@ Deactivation preserves settings. Uninstalling or deleting the plugin removes its
 
 ## Screenshots
 
-1. Basic Settings Panel
-2. DOM & Selectors Settings Panel
-3. Advanced Settings Panel
+1. Check Markdown status and size, copy or view the response, and control availability in the block editor.
+2. A public .md endpoint serves rendered content as Markdown with YAML front matter.
+3. Test content selectors and inspect a generated Markdown excerpt.
+4. Choose supported content types and configure Markdown behavior.
+5. Set main-content and exclusion selectors for rendered HTML.
+6. Configure optional header-based Markdown delivery and Accept-header matching.
 
 ## Changelog
 
