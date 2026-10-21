@@ -6,9 +6,12 @@ Serve clean Markdown versions of WordPress posts, pages, and custom post types f
 
 ## Description
 
-LLM Markdown makes your public WordPress content available as clean, structured Markdown at predictable `.md` URLs. Append `.md` to a supported post, page, or enabled custom post-type permalink:
+LLM Markdown makes your public WordPress content available as clean, structured Markdown at predictable `.md` URLs. See it on a live site:
 
-`https://example.com/my-post.md`
+* Static front page: [https://compiledrogue.com/index.md](https://compiledrogue.com/index.md)
+* Public custom post type: [https://compiledrogue.com/case-studies/sentinelone.md](https://compiledrogue.com/case-studies/sentinelone.md)
+
+For regular supported posts, pages, and custom post types, the `.md` URL follows the permalink. Static front pages also have an `/index.md` alias.
 
 LLM Markdown converts the actual server-rendered page after WordPress, blocks, shortcodes, and the active theme have processed it. You can choose the content container and exclude unwanted page elements. The original post remains unchanged. Markdown is generated on demand and cached temporarily; no API keys, external service, or static file management are required.
 
@@ -106,13 +109,13 @@ This is an advanced, disabled-by-default feature. A CDN, proxy, server cache, or
 
 Conservative matching requires an explicit `text/markdown` media range. The separate **Wildcard Accept Headers** option can also permit `text/*`; `*/*` alone never requests Markdown.
 
-Test HTML:
+Try the live HTML response:
 
-`curl -i -H "Accept: text/html" https://example.com/my-post/`
+`curl -i -H "Accept: text/html" https://compiledrogue.com/case-studies/sentinelone/`
 
-Test Markdown:
+Try the live negotiated Markdown response:
 
-`curl -i -H "Accept: text/markdown" https://example.com/my-post/`
+`curl -i -H "Accept: text/markdown" https://compiledrogue.com/case-studies/sentinelone/`
 
 ### How do I refresh cached Markdown after changing my theme or site layout?
 
