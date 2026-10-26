@@ -65,7 +65,14 @@ final class Editor_Tools {
 		}
 	}
 
-	public function register_classic_meta_box(string $post_type, WP_Post $post): void {
+	/**
+	 * @param mixed $post The global hook may pass a non-post object, such as an HPOS order.
+	 */
+	public function register_classic_meta_box(string $post_type, $post): void {
+		if (!($post instanceof WP_Post)) {
+			return;
+		}
+
 		if (!$this->can_show_for_post($post) || use_block_editor_for_post($post)) {
 			return;
 		}
@@ -235,6 +242,6 @@ final class Editor_Tools {
 	private function asset_version(string $relative_path) {
 		$path = LLMMD_PATH . $relative_path;
 		$modified = file_exists($path) ? filemtime($path) : false;
-		return false !== $modified ? $modified : '1.1.0';
+		return false !== $modified ? $modified : '1.1.1';
 	}
 }

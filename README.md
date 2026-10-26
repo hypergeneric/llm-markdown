@@ -1,6 +1,6 @@
 # LLM Markdown – Markdown Endpoints for AI Agents
 
-WordPress plugin · Version 1.1.0 · WordPress 6.0+ · PHP 7.4+ · GPLv2 or later
+WordPress plugin · Version 1.1.1 · WordPress 6.0+ · PHP 7.4+ · GPLv2 or later
 
 Serve clean Markdown versions of WordPress posts, pages, and custom post types for AI agents, LLM tools, and content pipelines.
 
@@ -145,6 +145,10 @@ Deactivation preserves settings. Uninstalling or deleting the plugin removes its
 6. Configure optional header-based Markdown delivery and Accept-header matching.
 
 ## Changelog
+
+### 1.1.1
+
+* Fixed a fatal error on WooCommerce HPOS order screens and other non-post meta-box screens while preserving editor tools for normal posts and pages.
 
 ### 1.1.0
 

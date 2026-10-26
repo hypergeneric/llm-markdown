@@ -3,7 +3,7 @@
  * Plugin Name:       LLM Markdown – Markdown Endpoints for AI Agents
  * Plugin URI:        https://compiledrogue.com/
  * Description:       Serves clean Markdown versions of WordPress posts, pages, and custom post types for AI agents, LLM tools, and content pipelines.
- * Version:           1.1.0
+ * Version:           1.1.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Compiled Rogue

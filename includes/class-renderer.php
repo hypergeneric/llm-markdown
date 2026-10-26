@@ -222,7 +222,7 @@ final class Renderer {
 				'Accept'               => 'text/html,application/xhtml+xml',
 				'X-LLMMD-Render-Source' => '1',
 			],
-			'user-agent'         => 'LLMMD/1.1.0',
+			'user-agent'         => 'LLMMD/1.1.1',
 		]);
 
 		if (is_wp_error($response)) {

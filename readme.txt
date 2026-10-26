@@ -6,7 +6,7 @@ Tags: markdown, ai-agents, llm, headless, content-export
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -153,6 +153,9 @@ Deactivation preserves settings. Uninstalling or deleting the plugin removes its
 6. Configure optional header-based Markdown delivery and Accept-header matching.
 
 == Changelog ==
+
+= 1.1.1 =
+* Fixed a fatal error on WooCommerce HPOS order screens and other non-post meta-box screens while preserving editor tools for normal posts and pages.
 
 = 1.1.0 =
 * Added in-editor Markdown view, copy, and public-URL controls to the block and Classic Editors, with response and size statistics in the block editor.
